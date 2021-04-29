@@ -119,10 +119,10 @@ func (m *MetricsCollectorBuild) collectDefinition(ctx context.Context, logger *l
 }
 
 func (m *MetricsCollectorBuild) collectBuilds(ctx context.Context, logger *log.Entry, callback chan<- func(), project devopsClient.Project) {
-	minTime := opts.Limit.FromTime
-	if minTime == nil {
-		minTime := time.Now().Add(-opts.Limit.BuildHistoryDuration)
-	}
+	// minTime := opts.Limit.FromTime
+	// if minTime == time. {
+	minTime := time.Now().Add(-opts.Limit.BuildHistoryDuration)
+	// }
 
 	list, err := AzureDevopsClient.ListBuildHistory(project.Id, minTime)
 	if err != nil {

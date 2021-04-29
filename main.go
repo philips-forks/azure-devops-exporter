@@ -2,17 +2,18 @@ package main
 
 import (
 	"fmt"
-	"github.com/jessevdk/go-flags"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
-	AzureDevops "github.com/webdevops/azure-devops-exporter/azure-devops-client"
-	"github.com/webdevops/azure-devops-exporter/config"
 	"net/http"
 	"os"
 	"path"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/jessevdk/go-flags"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
+	AzureDevops "github.com/webdevops/azure-devops-exporter/azure-devops-client"
+	"github.com/webdevops/azure-devops-exporter/config"
 )
 
 const (
@@ -53,8 +54,10 @@ func main() {
 
 // init argparser and parse/validate arguments
 func initArgparser() {
+
 	argparser = flags.NewParser(&opts, flags.Default)
 	_, err := argparser.Parse()
+	fmt.Println("FromTime: ", opts.Limit.FromTime)
 
 	// check if there is an parse error
 	if err != nil {

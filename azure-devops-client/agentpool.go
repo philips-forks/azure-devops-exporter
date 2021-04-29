@@ -73,6 +73,7 @@ type JobRequest struct {
 	AssignTime   *time.Time
 	ReceiveTime  time.Time
 	LockedUntil  time.Time
+	FinishTime   time.Time
 	ServiceOwner string
 	HostId       string
 	ScopeId      string
