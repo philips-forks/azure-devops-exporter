@@ -65,7 +65,7 @@ type (
 			ReleasesPerDefinition        int64         `long:"limit.releases-per-definition"         env:"LIMIT_RELEASES_PER_DEFINITION"         description:"Limit releases per definition"    default:"100"`
 			DeploymentPerDefinition      int64         `long:"limit.deployments-per-definition"      env:"LIMIT_DEPLOYMENTS_PER_DEFINITION"      description:"Limit deployments per definition" default:"100"`
 			ReleaseDefinitionsPerProject int64         `long:"limit.releasedefinitions-per-project"  env:"LIMIT_RELEASEDEFINITION_PER_PROJECT"   description:"Limit builds per definition"      default:"100"`
-			FromTime                     string        `long:"limit.from-time"                       env:"FROM_TIME"                             description:"Timestamp in RFC3339 format ('2006-01-02T15:04:05Z' or '2006-01-02T15:04:05+07:00') since which the historical data will be scraped"`
+			FromTime                     string        `long:"limit.from-time"                       env:"LIMIT_FROM_TIME"                       description:"Timestamp in RFC3339 format ('2006-01-02T15:04:05Z' or '2006-01-02T15:04:05+07:00') since which the historical data will be scraped"`
 			BuildHistoryDuration         time.Duration `long:"limit.build-history-duration"          env:"LIMIT_BUILD_HISTORY_DURATION"          description:"Time (time.Duration) how long the exporter should look back for builds"      default:"48h"`
 			ReleaseHistoryDuration       time.Duration `long:"limit.release-history-duration"        env:"LIMIT_RELEASE_HISTORY_DURATION"        description:"Time (time.Duration) how long the exporter should look back for releases"      default:"48h"`
 		}
