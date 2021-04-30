@@ -55,21 +55,8 @@ func main() {
 
 // init argparser and parse/validate arguments
 func initArgparser() {
-
 	argparser = flags.NewParser(&opts, flags.Default)
 	_, err := argparser.Parse()
-
-	if opts.Limit.FromTime != "" {
-		minTime, err = time.Parse(time.RFC3339, opts.Limit.FromTime)
-		if err != nil {
-			fmt.Println("FromTime '", opts.Limit.FromTime, "' cannot be parsed in the format '", time.RFC3339, "'")
-			os.Exit(1)
-		}
-	} else {
-		minTime = time.Now().Add(-opts.Limit.BuildHistoryDuration)
-	}
-
-	fmt.Println(minTime)
 
 	// check if there is an parse error
 	if err != nil {
@@ -123,6 +110,14 @@ func initArgparser() {
 			}
 		}
 		if queryError {
+			os.Exit(1)
+		}
+	}
+
+	if opts.Limit.FromTime != "" {
+		minTime, err = time.Parse(time.RFC3339, opts.Limit.FromTime)
+		if err != nil {
+			fmt.Println("FromTime '", opts.Limit.FromTime, "' cannot be parsed in the format '", time.RFC3339, "'")
 			os.Exit(1)
 		}
 	}
