@@ -24,6 +24,8 @@ type MetricsCollectorBuild struct {
 	}
 }
 
+var buildMinTime *time.Time
+
 func (m *MetricsCollectorBuild) Setup(collector *CollectorProject) {
 	m.CollectorReference = collector
 
@@ -119,20 +121,24 @@ func (m *MetricsCollectorBuild) collectDefinition(ctx context.Context, logger *l
 }
 
 func (m *MetricsCollectorBuild) collectBuilds(ctx context.Context, logger *log.Entry, callback chan<- func(), project devopsClient.Project) {
-	if opts.Limit.FromTime == "" {
-		minTime = time.Now().Add(-opts.Limit.BuildHistoryDuration)
+	if buildMinTime == nil {
+		minTime := time.Now().Add(-opts.Limit.BuildHistoryDuration)
+		buildMinTime = &minTime
 	}
 
-	list, err := AzureDevopsClient.ListBuildHistory(project.Id, minTime)
+	lastScrapeTime := time.Now()
+	buildList, err := AzureDevopsClient.ListBuildHistory(project.Id, *buildMinTime)
 	if err != nil {
 		logger.Error(err)
 		return
 	}
 
+	buildMinTime = &lastScrapeTime
+
 	buildMetric := prometheusCommon.NewMetricsList()
 	buildStatusMetric := prometheusCommon.NewMetricsList()
 
-	for _, build := range list.List {
+	for _, build := range buildList.List {
 		buildMetric.AddInfo(prometheus.Labels{
 			"projectID":         project.Id,
 			"buildDefinitionID": int64ToString(build.Definition.Id),

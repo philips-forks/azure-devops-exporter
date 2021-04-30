@@ -23,7 +23,6 @@ const (
 var (
 	argparser *flags.Parser
 	opts      config.Opts
-	minTime   time.Time
 
 	AzureDevopsClient *AzureDevops.AzureDevopsClient
 
@@ -110,14 +109,6 @@ func initArgparser() {
 			}
 		}
 		if queryError {
-			os.Exit(1)
-		}
-	}
-
-	if opts.Limit.FromTime != "" {
-		minTime, err = time.Parse(time.RFC3339, opts.Limit.FromTime)
-		if err != nil {
-			fmt.Println("FromTime '", opts.Limit.FromTime, "' cannot be parsed in the format '", time.RFC3339, "'")
 			os.Exit(1)
 		}
 	}

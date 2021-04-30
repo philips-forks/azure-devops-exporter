@@ -25,6 +25,8 @@ type MetricsCollectorRelease struct {
 	}
 }
 
+var releaseMinTime *time.Time
+
 func (m *MetricsCollectorRelease) Setup(collector *CollectorProject) {
 	m.CollectorReference = collector
 
@@ -211,15 +213,19 @@ func (m *MetricsCollectorRelease) Collect(ctx context.Context, logger *log.Entry
 
 	// --------------------------------------
 	// Releases
-	if opts.Limit.FromTime == "" {
-		minTime = time.Now().Add(-opts.Limit.ReleaseHistoryDuration)
+	if releaseMinTime == nil {
+		minTime := time.Now().Add(-opts.Limit.ReleaseHistoryDuration)
+		releaseMinTime = &minTime
 	}
 
-	releaseList, err := AzureDevopsClient.ListReleaseHistory(project.Id, minTime)
+	lastScrapeTime := time.Now()
+	releaseList, err := AzureDevopsClient.ListReleaseHistory(project.Id, *releaseMinTime)
 	if err != nil {
 		logger.Error(err)
 		return
 	}
+
+	releaseMinTime = &lastScrapeTime
 
 	for _, release := range releaseList.List {
 		releaseMetric.AddInfo(prometheus.Labels{
