@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	devopsClient "github.com/webdevops/azure-devops-exporter/azure-devops-client"
@@ -19,6 +20,8 @@ type MetricsCollectorAgentPool struct {
 		agentPoolAgentStatus *prometheus.GaugeVec
 		agentPoolAgentJob    *prometheus.GaugeVec
 		agentPoolQueueLength *prometheus.GaugeVec
+		agentPoolJobInfo     *prometheus.GaugeVec
+		agentPoolJobWaitTime *prometheus.GaugeVec
 	}
 }
 
@@ -99,6 +102,7 @@ func (m *MetricsCollectorAgentPool) Setup(collector *CollectorAgentPool) {
 			Help: "Azure DevOps agentpool",
 		},
 		[]string{
+			"agentPoolID",
 			"agentPoolAgentID",
 			"jobRequestId",
 			"definitionID",
@@ -119,6 +123,23 @@ func (m *MetricsCollectorAgentPool) Setup(collector *CollectorAgentPool) {
 		},
 	)
 	prometheus.MustRegister(m.prometheus.agentPoolQueueLength)
+
+	m.prometheus.agentPoolJobWaitTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azure_devops_agentpool_job_wait_time",
+			Help: "Azure Devops agentpool",
+		},
+		[]string{
+			"agentPoolID",
+			"agentPoolAgentID",
+			"jobRequestId",
+			"definitionID",
+			"definitionName",
+			"planType",
+			"scopeID",
+		},
+	)
+	prometheus.MustRegister(m.prometheus.agentPoolJobWaitTime)
 }
 
 func (m *MetricsCollectorAgentPool) Reset() {
@@ -188,6 +209,7 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 	agentPoolAgentMetric := prometheusCommon.NewMetricsList()
 	agentPoolAgentStatusMetric := prometheusCommon.NewMetricsList()
 	agentPoolAgentJobMetric := prometheusCommon.NewMetricsList()
+	agentPoolJobWaitTimeMetric := prometheusCommon.NewMetricsList()
 
 	agentPoolSize := 0
 	agentPoolUsed := 0
@@ -225,6 +247,8 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 				"scopeID":          agentPoolAgent.AssignedRequest.ScopeId,
 			}
 			agentPoolAgentJobMetric.Add(jobLabels, timeToFloat64(*agentPoolAgent.AssignedRequest.AssignTime))
+			agentPoolJobWaitTimeMetric.Add(jobLabels, timeToFloat64(*agentPoolAgent.AssignedRequest.AssignTime)-timeToFloat64(agentPoolAgent.AssignedRequest.QueueTime))
+
 		}
 	}
 
@@ -237,6 +261,7 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 		agentPoolAgentMetric.GaugeSet(m.prometheus.agentPoolAgent)
 		agentPoolAgentStatusMetric.GaugeSet(m.prometheus.agentPoolAgentStatus)
 		agentPoolAgentJobMetric.GaugeSet(m.prometheus.agentPoolAgentJob)
+		agentPoolJobWaitTimeMetric.GaugeSet(m.prometheus.agentPoolJobWaitTime)
 	}
 }
 
