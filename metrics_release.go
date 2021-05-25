@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	devopsClient "github.com/webdevops/azure-devops-exporter/azure-devops-client"
 	prometheusCommon "github.com/webdevops/go-prometheus-common"
-	"time"
 )
 
 type MetricsCollectorRelease struct {
@@ -23,6 +24,8 @@ type MetricsCollectorRelease struct {
 		releaseDefinitionEnvironment *prometheus.GaugeVec
 	}
 }
+
+var releaseMinTime *time.Time
 
 func (m *MetricsCollectorRelease) Setup(collector *CollectorProject) {
 	m.CollectorReference = collector
@@ -210,13 +213,19 @@ func (m *MetricsCollectorRelease) Collect(ctx context.Context, logger *log.Entry
 
 	// --------------------------------------
 	// Releases
-	minTime := time.Now().Add(-opts.Limit.ReleaseHistoryDuration)
+	if releaseMinTime == nil {
+		minTime := time.Now().Add(-opts.Limit.ReleaseHistoryDuration)
+		releaseMinTime = &minTime
+	}
 
-	releaseList, err := AzureDevopsClient.ListReleaseHistory(project.Id, minTime)
+	lastScrapeTime := time.Now()
+	releaseList, err := AzureDevopsClient.ListReleaseHistory(project.Id, *releaseMinTime)
 	if err != nil {
 		logger.Error(err)
 		return
 	}
+
+	releaseMinTime = &lastScrapeTime
 
 	for _, release := range releaseList.List {
 		releaseMetric.AddInfo(prometheus.Labels{
