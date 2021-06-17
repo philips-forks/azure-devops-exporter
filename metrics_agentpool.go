@@ -127,11 +127,11 @@ func (m *MetricsCollectorAgentPool) Setup(collector *CollectorAgentPool) {
 			Help: "Azure Devops Agentpool",
 		},
 		[]string{
+			"Name",
 			"jobRequestID",
 			"QueueTime",
 			"AssignTime",
 			"ReceiveTime",
-			"LockedUntil",
 			"FinishTime",
 			"JobID",
 		},
@@ -266,7 +266,7 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 	}
 
 	agentPoolQueueLengthMetric := prometheusCommon.NewMetricsList()
-	agentPoolJobRequest := prometheusCommon.NewMetricsList()
+	agentPoolJobRequestMetric := prometheusCommon.NewMetricsList()
 
 	notStartedJobCount := 0
 
@@ -276,14 +276,16 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 		}
 
 		infoLabels := prometheus.Labels{
-			"jobRequestID": time.Format
-			"QueueTime":
-			"AssignTime":
-			"ReceiveTime":
-			"LockedUntil":
-			"FinishTime":
-			"JobID":
+			"Name": agentPoolJob.Definition.Name,
+			"jobRequestID": agentPoolJob.RequestId,
+			"QueueTime": timeToString(agentPoolJob.QueueTime)
+			"AssignTime": timeToString(*agentPoolJob.AssignTime)
+			"ReceiveTime": timeToString(agentPoolJob.ReceiveTime)
+			"FinishTime": timeToString(agentPoolJob.FinishTime)
+			"JobID": agentPoolJob.JobID
 		}
+		
+		agentPoolJobRequestMetric.Add(infoLabels, 1)
 	}
 
 	infoLabels := prometheus.Labels{
