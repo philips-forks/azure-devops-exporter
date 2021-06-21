@@ -70,7 +70,7 @@ type JobRequest struct {
 	RequestId    int64
 	Demands      []string
 	QueueTime    time.Time
-	AssignTime   *time.Time
+	AssignTime   time.Time
 	ReceiveTime  time.Time
 	LockedUntil  time.Time
 	FinishTime   time.Time

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	devopsClient "github.com/webdevops/azure-devops-exporter/azure-devops-client"
@@ -19,7 +20,7 @@ type MetricsCollectorAgentPool struct {
 		agentPoolAgentStatus *prometheus.GaugeVec
 		agentPoolAgentJob    *prometheus.GaugeVec
 		agentPoolQueueLength *prometheus.GaugeVec
-		agentPoolJobRequest	*prometheus.GaugeVec
+		agentPoolJobRequest  *prometheus.GaugeVec
 	}
 }
 
@@ -242,7 +243,7 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 				"definitionName":   agentPoolAgent.AssignedRequest.Definition.Name,
 				"scopeID":          agentPoolAgent.AssignedRequest.ScopeId,
 			}
-			agentPoolAgentJobMetric.Add(jobLabels, timeToFloat64(*agentPoolAgent.AssignedRequest.AssignTime))
+			agentPoolAgentJobMetric.Add(jobLabels, timeToFloat64(agentPoolAgent.AssignedRequest.AssignTime))
 		}
 	}
 
@@ -271,20 +272,20 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 	notStartedJobCount := 0
 
 	for _, agentPoolJob := range list.List {
-		if agentPoolJob.AssignTime == nil {
+		if agentPoolJob.AssignTime.IsZero() {
 			notStartedJobCount++
 		}
 
 		infoLabels := prometheus.Labels{
-			"Name": agentPoolJob.Definition.Name,
-			"jobRequestID": agentPoolJob.RequestId,
-			"QueueTime": timeToString(agentPoolJob.QueueTime)
-			"AssignTime": timeToString(*agentPoolJob.AssignTime)
-			"ReceiveTime": timeToString(agentPoolJob.ReceiveTime)
-			"FinishTime": timeToString(agentPoolJob.FinishTime)
-			"JobID": agentPoolJob.JobID
+			"Name":         agentPoolJob.Definition.Name,
+			"jobRequestID": int64ToString(agentPoolJob.RequestId),
+			"QueueTime":    timeToString(agentPoolJob.QueueTime),
+			"AssignTime":   timeToString(agentPoolJob.AssignTime),
+			"ReceiveTime":  timeToString(agentPoolJob.ReceiveTime),
+			"FinishTime":   timeToString(agentPoolJob.FinishTime),
+			"JobID":        agentPoolJob.JobId,
 		}
-		
+
 		agentPoolJobRequestMetric.Add(infoLabels, 1)
 	}
 
@@ -296,5 +297,6 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 
 	callback <- func() {
 		agentPoolQueueLengthMetric.GaugeSet(m.prometheus.agentPoolQueueLength)
+		agentPoolJobRequestMetric.GaugeSet(m.prometheus.agentPoolJobRequest)
 	}
 }
