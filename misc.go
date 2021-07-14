@@ -28,7 +28,3 @@ func arrayStringContains(s []string, e string) bool {
 func timeToFloat64(v time.Time) float64 {
 	return float64(v.Unix())
 }
-
-func timeToString(v time.Time) string {
-	return strconv.FormatFloat(float64(v.Unix()), 'E', -1, 64)
-}
