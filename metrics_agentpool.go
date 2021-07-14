@@ -279,7 +279,6 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 		}
 
 		agentPoolAgentMetric.Add(infoLabels, 1)
-		// logger.WithField("agentPoolAgentMetric:", agentPoolAgentMetric).Infof("These is the agentpoolAgent metric")
 
 		statusCreatedLabels := prometheus.Labels{
 			"agentPoolAgentID": int64ToString(agentPoolAgent.Id),
@@ -297,8 +296,8 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 				"definitionName":   agentPoolAgent.AssignedRequest.Definition.Name,
 				"scopeID":          agentPoolAgent.AssignedRequest.ScopeId,
 			}
+
 			agentPoolAgentJobMetric.Add(jobLabels, timeToFloat64(agentPoolAgent.AssignedRequest.AssignTime))
-			// logger.WithField("agentPoolJobInfoMetric:", agentPoolAgentJobMetric).Infof("These is the agentpoolAgentJobInfo metric")
 		}
 	}
 
@@ -346,10 +345,7 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 				"JobID":        agentPoolJob.JobId,
 				"Result":       agentPoolJob.Result,
 			}
-
-			// logger.WithField("infoLabels:", infoLabels).Infof("These are the joblabels added to agentpoolJobRequest metric")
 			agentPoolJobRequestInfoMetric.AddInfo(jobLabels)
-			// logger.WithField("agentPoolJobRequestMetric:", agentPoolJobRequestInfoMetric).Infof("These is the agentpoolAgentJob metric")
 
 			agentPoolJobAssignTimeMetric.Add(prometheus.Labels{
 				"jobRequestID": int64ToString(agentPoolJob.RequestId),
@@ -383,6 +379,5 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 		agentPoolJobQueueTimeMetric.GaugeSet(m.prometheus.agentPoolJobQueueTime)
 		agentPoolJobReceiveTimeMetric.GaugeSet(m.prometheus.agentPoolJobReceiveTime)
 		agentPoolJobFinishTimeMetric.GaugeSet(m.prometheus.agentPoolJobFinishTime)
-		// logger.WithField("agentPoolJobRequestGuage:", *m.prometheus.agentPoolJobRequest).Infof("These is the agentpoolAgentJobRequest prometheus gauge")
 	}
 }
