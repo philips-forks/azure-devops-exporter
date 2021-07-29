@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -262,7 +263,6 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 	agentPoolSize := 0
 	agentPoolUsed := 0
 
-	logger.Infof("Traversing the agentpool agent list %v", list.Count)
 	for _, agentPoolAgent := range list.List {
 		agentPoolSize++
 		infoLabels := prometheus.Labels{
@@ -306,7 +306,6 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 	}, float64(agentPoolUsed)/float64(agentPoolSize))
 
 	callback <- func() {
-		// TODO: loggerwithfield, log every metric
 		agentPoolUsageMetric.GaugeSet(m.prometheus.agentPoolUsage)
 		agentPoolAgentMetric.GaugeSet(m.prometheus.agentPoolAgent)
 		agentPoolAgentStatusMetric.GaugeSet(m.prometheus.agentPoolAgentStatus)
@@ -320,8 +319,6 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 		logger.Error(err)
 		return
 	}
-
-	logger.WithField("Number of agentpool jobs:", list.Count).Infof("This is the number of agentpool jobs in the pool %v", agentPoolId)
 
 	agentPoolQueueLengthMetric := prometheusCommon.NewMetricsList()
 	agentPoolJobRequestInfoMetric := prometheusCommon.NewMetricsList()
@@ -338,7 +335,12 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 			notStartedJobCount++
 		}
 
-		if timeToFloat64(agentPoolJob.FinishTime) > 0 && timeToFloat64(agentPoolJob.AssignTime) > 0 && agentPoolJob.Result != "canceled" {
+		currentTime := time.Now().UTC()
+		timeInterval := 2
+		previousTime := currentTime.Add(time.Duration(-timeInterval) * time.Hour)
+
+		if agentPoolJob.FinishTime.After(previousTime) == true && agentPoolJob.FinishTime.Before(currentTime) == true && agentPoolJob.Result != "canceled" {
+
 			jobLabels := prometheus.Labels{
 				"Name":         agentPoolJob.Definition.Name,
 				"jobRequestID": int64ToString(agentPoolJob.RequestId),
