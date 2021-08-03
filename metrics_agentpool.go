@@ -337,12 +337,14 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 
 		currentTime := time.Now().UTC()
 		timeInterval := opts.Limit.AgentpoolBuildsDuration
-		previousTime := currentTime.Add(time.Duration(-timeInterval) * time.Hour)
+
+		previousTime := currentTime.Add(time.Duration(-timeInterval) * time.Minute)
 
 		if agentPoolJob.FinishTime.After(previousTime) && agentPoolJob.FinishTime.Before(currentTime) && timeToFloat64(agentPoolJob.AssignTime) > 0 && agentPoolJob.Result != "canceled" {
 
 			jobLabels := prometheus.Labels{
 				"Name":         agentPoolJob.Definition.Name,
+				"AgentPoolID":  int64ToString(agentPoolId),
 				"jobRequestID": int64ToString(agentPoolJob.RequestId),
 				"JobID":        agentPoolJob.JobId,
 				"Result":       agentPoolJob.Result,
