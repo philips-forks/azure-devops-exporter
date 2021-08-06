@@ -22,10 +22,7 @@ type MetricsCollectorAgentPool struct {
 		agentPoolAgentJob       *prometheus.GaugeVec
 		agentPoolQueueLength    *prometheus.GaugeVec
 		agentPoolJobRequestInfo *prometheus.GaugeVec
-		agentPoolJobAssignTime  *prometheus.GaugeVec
-		agentPoolJobQueueTime   *prometheus.GaugeVec
-		agentPoolJobReceiveTime *prometheus.GaugeVec
-		agentPoolJobFinishTime  *prometheus.GaugeVec
+		agentPoolJobWaitTime    *prometheus.GaugeVec
 	}
 }
 
@@ -134,6 +131,7 @@ func (m *MetricsCollectorAgentPool) Setup(collector *CollectorAgentPool) {
 		},
 		[]string{
 			"Name",
+			"agentPoolID",
 			"jobRequestID",
 			"JobID",
 			"Result",
@@ -141,49 +139,18 @@ func (m *MetricsCollectorAgentPool) Setup(collector *CollectorAgentPool) {
 	)
 	prometheus.MustRegister(m.prometheus.agentPoolJobRequestInfo)
 
-	m.prometheus.agentPoolJobAssignTime = prometheus.NewGaugeVec(
+	m.prometheus.agentPoolJobWaitTime = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "azure_devops_agentpool_job_assigntime",
+			Name: "azure_devops_agentpool_job_waittime",
 			Help: "Azure Devops Agentpool",
 		},
 		[]string{
 			"jobRequestID",
+			"agentPoolID",
 		},
 	)
-	prometheus.MustRegister(m.prometheus.agentPoolJobAssignTime)
+	prometheus.MustRegister(m.prometheus.agentPoolJobWaitTime)
 
-	m.prometheus.agentPoolJobQueueTime = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azure_devops_agentpool_job_queuetime",
-			Help: "Azure Devops Agentpool",
-		},
-		[]string{
-			"jobRequestID",
-		},
-	)
-	prometheus.MustRegister(m.prometheus.agentPoolJobQueueTime)
-
-	m.prometheus.agentPoolJobReceiveTime = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azure_devops_agentpool_job_receivetime",
-			Help: "Azure Devops Agentpool",
-		},
-		[]string{
-			"jobRequestID",
-		},
-	)
-	prometheus.MustRegister(m.prometheus.agentPoolJobReceiveTime)
-
-	m.prometheus.agentPoolJobFinishTime = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "azure_devops_agentpool_job_finishtime",
-			Help: "Azure Devops Agentpool",
-		},
-		[]string{
-			"jobRequestID",
-		},
-	)
-	prometheus.MustRegister(m.prometheus.agentPoolJobFinishTime)
 }
 
 func (m *MetricsCollectorAgentPool) Reset() {
@@ -194,10 +161,7 @@ func (m *MetricsCollectorAgentPool) Reset() {
 	m.prometheus.agentPoolAgentJob.Reset()
 	m.prometheus.agentPoolQueueLength.Reset()
 	m.prometheus.agentPoolJobRequestInfo.Reset()
-	m.prometheus.agentPoolJobAssignTime.Reset()
-	m.prometheus.agentPoolJobQueueTime.Reset()
-	m.prometheus.agentPoolJobReceiveTime.Reset()
-	m.prometheus.agentPoolJobFinishTime.Reset()
+	m.prometheus.agentPoolJobWaitTime.Reset()
 
 }
 
@@ -322,10 +286,7 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 
 	agentPoolQueueLengthMetric := prometheusCommon.NewMetricsList()
 	agentPoolJobRequestInfoMetric := prometheusCommon.NewMetricsList()
-	agentPoolJobAssignTimeMetric := prometheusCommon.NewMetricsList()
-	agentPoolJobQueueTimeMetric := prometheusCommon.NewMetricsList()
-	agentPoolJobReceiveTimeMetric := prometheusCommon.NewMetricsList()
-	agentPoolJobFinishTimeMetric := prometheusCommon.NewMetricsList()
+	agentPoolJobWaitTimeMetric := prometheusCommon.NewMetricsList()
 
 	notStartedJobCount := 0
 
@@ -340,32 +301,38 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 
 		previousTime := currentTime.Add(time.Duration(-timeInterval) * time.Minute)
 
-		if agentPoolJob.FinishTime.After(previousTime) && agentPoolJob.FinishTime.Before(currentTime) && timeToFloat64(agentPoolJob.AssignTime) > 0 && agentPoolJob.Result != "canceled" {
+		if agentPoolJob.AssignTime.After(previousTime) && agentPoolJob.AssignTime.Before(currentTime) {
 
 			jobLabels := prometheus.Labels{
 				"Name":         agentPoolJob.Definition.Name,
-				"AgentPoolID":  int64ToString(agentPoolId),
+				"agentPoolID":  int64ToString(agentPoolId),
 				"jobRequestID": int64ToString(agentPoolJob.RequestId),
 				"JobID":        agentPoolJob.JobId,
 				"Result":       agentPoolJob.Result,
 			}
 			agentPoolJobRequestInfoMetric.AddInfo(jobLabels)
 
-			agentPoolJobAssignTimeMetric.Add(prometheus.Labels{
+			agentPoolJobWaitTimeMetric.Add(prometheus.Labels{
 				"jobRequestID": int64ToString(agentPoolJob.RequestId),
-			}, timeToFloat64(agentPoolJob.AssignTime))
+				"agentPoolID":  int64ToString(agentPoolId),
+			}, timeToFloat64(agentPoolJob.AssignTime)-timeToFloat64(agentPoolJob.QueueTime))
 
-			agentPoolJobQueueTimeMetric.Add(prometheus.Labels{
-				"jobRequestID": int64ToString(agentPoolJob.RequestId),
-			}, timeToFloat64(agentPoolJob.QueueTime))
+		} else if timeToFloat64(agentPoolJob.AssignTime) < 0 {
 
-			agentPoolJobReceiveTimeMetric.Add(prometheus.Labels{
+			jobLabels := prometheus.Labels{
+				"Name":         agentPoolJob.Definition.Name,
+				"agentPoolID":  int64ToString(agentPoolId),
 				"jobRequestID": int64ToString(agentPoolJob.RequestId),
-			}, timeToFloat64(agentPoolJob.ReceiveTime))
+				"JobID":        agentPoolJob.JobId,
+				"Result":       agentPoolJob.Result,
+			}
+			agentPoolJobRequestInfoMetric.AddInfo(jobLabels)
 
-			agentPoolJobFinishTimeMetric.Add(prometheus.Labels{
+			agentPoolJobWaitTimeMetric.Add(prometheus.Labels{
 				"jobRequestID": int64ToString(agentPoolJob.RequestId),
-			}, timeToFloat64(agentPoolJob.FinishTime))
+				"agentPoolID":  int64ToString(agentPoolId),
+			}, timeToFloat64(currentTime)-timeToFloat64(agentPoolJob.QueueTime))
+
 		}
 
 	}
@@ -379,9 +346,6 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 	callback <- func() {
 		agentPoolQueueLengthMetric.GaugeSet(m.prometheus.agentPoolQueueLength)
 		agentPoolJobRequestInfoMetric.GaugeSet(m.prometheus.agentPoolJobRequestInfo)
-		agentPoolJobAssignTimeMetric.GaugeSet(m.prometheus.agentPoolJobAssignTime)
-		agentPoolJobQueueTimeMetric.GaugeSet(m.prometheus.agentPoolJobQueueTime)
-		agentPoolJobReceiveTimeMetric.GaugeSet(m.prometheus.agentPoolJobReceiveTime)
-		agentPoolJobFinishTimeMetric.GaugeSet(m.prometheus.agentPoolJobFinishTime)
+		agentPoolJobWaitTimeMetric.GaugeSet(m.prometheus.agentPoolJobWaitTime)
 	}
 }
