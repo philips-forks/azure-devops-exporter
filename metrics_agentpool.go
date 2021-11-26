@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	devopsClient "github.com/webdevops/azure-devops-exporter/azure-devops-client"
@@ -12,13 +14,15 @@ type MetricsCollectorAgentPool struct {
 	CollectorProcessorAgentPool
 
 	prometheus struct {
-		agentPool            *prometheus.GaugeVec
-		agentPoolSize        *prometheus.GaugeVec
-		agentPoolUsage       *prometheus.GaugeVec
-		agentPoolAgent       *prometheus.GaugeVec
-		agentPoolAgentStatus *prometheus.GaugeVec
-		agentPoolAgentJob    *prometheus.GaugeVec
-		agentPoolQueueLength *prometheus.GaugeVec
+		agentPool               *prometheus.GaugeVec
+		agentPoolSize           *prometheus.GaugeVec
+		agentPoolUsage          *prometheus.GaugeVec
+		agentPoolAgent          *prometheus.GaugeVec
+		agentPoolAgentStatus    *prometheus.GaugeVec
+		agentPoolAgentJob       *prometheus.GaugeVec
+		agentPoolQueueLength    *prometheus.GaugeVec
+		agentPoolJobRequestInfo *prometheus.GaugeVec
+		agentPoolJobWaitTime    *prometheus.GaugeVec
 	}
 }
 
@@ -119,6 +123,34 @@ func (m *MetricsCollectorAgentPool) Setup(collector *CollectorAgentPool) {
 		},
 	)
 	prometheus.MustRegister(m.prometheus.agentPoolQueueLength)
+
+	m.prometheus.agentPoolJobRequestInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azure_devops_agentpool_job_request_info",
+			Help: "Azure Devops Agentpool",
+		},
+		[]string{
+			"Name",
+			"agentPoolID",
+			"jobRequestID",
+			"JobID",
+			"Result",
+		},
+	)
+	prometheus.MustRegister(m.prometheus.agentPoolJobRequestInfo)
+
+	m.prometheus.agentPoolJobWaitTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "azure_devops_agentpool_job_waittime",
+			Help: "Azure Devops Agentpool",
+		},
+		[]string{
+			"jobRequestID",
+			"agentPoolID",
+		},
+	)
+	prometheus.MustRegister(m.prometheus.agentPoolJobWaitTime)
+
 }
 
 func (m *MetricsCollectorAgentPool) Reset() {
@@ -128,6 +160,9 @@ func (m *MetricsCollectorAgentPool) Reset() {
 	m.prometheus.agentPoolAgentStatus.Reset()
 	m.prometheus.agentPoolAgentJob.Reset()
 	m.prometheus.agentPoolQueueLength.Reset()
+	m.prometheus.agentPoolJobRequestInfo.Reset()
+	m.prometheus.agentPoolJobWaitTime.Reset()
+
 }
 
 func (m *MetricsCollectorAgentPool) Collect(ctx context.Context, logger *log.Entry, callback chan<- func()) {
@@ -191,6 +226,7 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 
 	agentPoolSize := 0
 	agentPoolUsed := 0
+
 	for _, agentPoolAgent := range list.List {
 		agentPoolSize++
 		infoLabels := prometheus.Labels{
@@ -224,7 +260,8 @@ func (m *MetricsCollectorAgentPool) collectAgentQueues(ctx context.Context, logg
 				"definitionName":   agentPoolAgent.AssignedRequest.Definition.Name,
 				"scopeID":          agentPoolAgent.AssignedRequest.ScopeId,
 			}
-			agentPoolAgentJobMetric.Add(jobLabels, timeToFloat64(*agentPoolAgent.AssignedRequest.AssignTime))
+
+			agentPoolAgentJobMetric.Add(jobLabels, timeToFloat64(agentPoolAgent.AssignedRequest.AssignTime))
 		}
 	}
 
@@ -248,13 +285,56 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 	}
 
 	agentPoolQueueLengthMetric := prometheusCommon.NewMetricsList()
+	agentPoolJobRequestInfoMetric := prometheusCommon.NewMetricsList()
+	agentPoolJobWaitTimeMetric := prometheusCommon.NewMetricsList()
 
 	notStartedJobCount := 0
 
 	for _, agentPoolJob := range list.List {
-		if agentPoolJob.AssignTime == nil {
+
+		if agentPoolJob.AssignTime.IsZero() {
 			notStartedJobCount++
 		}
+
+		currentTime := time.Now().UTC()
+		timeInterval := opts.Limit.AgentpoolBuildsDuration
+
+		previousTime := currentTime.Add(time.Duration(-timeInterval) * time.Minute)
+
+		if agentPoolJob.AssignTime.After(previousTime) && agentPoolJob.AssignTime.Before(currentTime) {
+
+			jobLabels := prometheus.Labels{
+				"Name":         agentPoolJob.Definition.Name,
+				"agentPoolID":  int64ToString(agentPoolId),
+				"jobRequestID": int64ToString(agentPoolJob.RequestId),
+				"JobID":        agentPoolJob.JobId,
+				"Result":       agentPoolJob.Result,
+			}
+			agentPoolJobRequestInfoMetric.AddInfo(jobLabels)
+
+			agentPoolJobWaitTimeMetric.Add(prometheus.Labels{
+				"jobRequestID": int64ToString(agentPoolJob.RequestId),
+				"agentPoolID":  int64ToString(agentPoolId),
+			}, timeToFloat64(agentPoolJob.AssignTime)-timeToFloat64(agentPoolJob.QueueTime))
+
+		} else if timeToFloat64(agentPoolJob.AssignTime) < 0 {
+
+			jobLabels := prometheus.Labels{
+				"Name":         agentPoolJob.Definition.Name,
+				"agentPoolID":  int64ToString(agentPoolId),
+				"jobRequestID": int64ToString(agentPoolJob.RequestId),
+				"JobID":        agentPoolJob.JobId,
+				"Result":       agentPoolJob.Result,
+			}
+			agentPoolJobRequestInfoMetric.AddInfo(jobLabels)
+
+			agentPoolJobWaitTimeMetric.Add(prometheus.Labels{
+				"jobRequestID": int64ToString(agentPoolJob.RequestId),
+				"agentPoolID":  int64ToString(agentPoolId),
+			}, timeToFloat64(currentTime)-timeToFloat64(agentPoolJob.QueueTime))
+
+		}
+
 	}
 
 	infoLabels := prometheus.Labels{
@@ -265,5 +345,7 @@ func (m *MetricsCollectorAgentPool) collectAgentPoolJobs(ctx context.Context, lo
 
 	callback <- func() {
 		agentPoolQueueLengthMetric.GaugeSet(m.prometheus.agentPoolQueueLength)
+		agentPoolJobRequestInfoMetric.GaugeSet(m.prometheus.agentPoolJobRequestInfo)
+		agentPoolJobWaitTimeMetric.GaugeSet(m.prometheus.agentPoolJobWaitTime)
 	}
 }
